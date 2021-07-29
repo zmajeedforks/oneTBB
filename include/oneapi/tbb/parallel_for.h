@@ -60,6 +60,75 @@ concept parallel_for_function = requires( const std::remove_reference_t<Function
 #endif // __TBB_CPP20_CONCEPTS_PRESENT
 namespace d1 {
 
+template<int Width, typename Range, typename Body>
+struct static_partitioner_for : public task {
+    Range my_range;
+    const Body my_body;
+    node* my_parent;
+
+
+    static_partitioner::task_partition_type my_partition;
+    small_object_allocator my_allocator;
+
+    static_partitioner_for(const Range& range, const Body& body, static_partitioner& partitioner, small_object_allocator& alloc) :
+        my_range(range),
+        my_body(body),
+        my_partition(partitioner),
+        my_allocator(alloc) {}
+
+    task* execute(execution_data& ed) override {
+
+        // if ( range.is_divisible() ) {
+        //    if ( my_partition.is_divisible() ) {
+        //         do { // split until is divisible
+        //             auto split_obj = my_partition.template get_split<Range>();
+        //             start.offer_work( split_obj, ed );
+        //         } while ( range.is_divisible() && my_partition.is_divisible() );
+        //     }
+        // }
+
+        my_body(my_range);
+
+        finalize(ed);
+        return nullptr;
+    }
+
+    task* cancel(execution_data& ed) {
+        finalize(ed);
+        return nullptr;
+    }
+
+    static void run(const Range& range, const Body& body, static_partitioner& partitioner) {
+        task_group_context context(PARALLEL_FOR);
+        run(range, body, partitioner, context);
+    }
+
+    static void run(const Range& range, const Body& body, static_partitioner& partitioner, task_group_context& context) {
+        if ( !range.empty() ) {
+            small_object_allocator alloc{};
+            static_partitioner_for& for_task = *alloc.new_object<static_partitioner_for>(range, body, partitioner, alloc);
+
+            // defer creation of the wait node until task allocation succeeds
+            wait_node wn;
+            for_task.my_parent = &wn;
+            execute_and_wait(for_task, context, wn.m_wait, context);
+        }
+    }
+
+    void finalize(const execution_data& ed) {
+        // Get the current parent and allocator an object destruction
+        node* parent = my_parent;
+        auto allocator = my_allocator;
+        // Task execution finished - destroy it
+        this->~static_partitioner_for();
+        // Unwind the tree decrementing the parent`s reference count
+
+        fold_tree<tree_node>(parent, ed);
+        allocator.deallocate(this, ed);
+
+    }
+};
+
 //! Task type used in parallel_for
 /** @ingroup algorithms */
 template<typename Range, typename Body, typename Partitioner>
@@ -252,7 +321,11 @@ void parallel_for( const Range& range, const Body& body, const auto_partitioner&
 template<typename Range, typename Body>
     __TBB_requires(tbb_range<Range> && parallel_for_body<Body, Range>)
 void parallel_for( const Range& range, const Body& body, const static_partitioner& partitioner ) {
-    start_for<Range,Body,const static_partitioner>::run(range,body,partitioner);
+#if 0
+    static_partitioner_for<8, Range, Body, const static_partitioner>::run(range, body, partitioner);
+#else
+    start_for<Range,Body,const static_partitioner>::run(range, body, partitioner);
+#endif
 }
 
 //! Parallel iteration over range with affinity_partitioner.
