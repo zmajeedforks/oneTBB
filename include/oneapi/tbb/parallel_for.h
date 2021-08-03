@@ -60,33 +60,107 @@ concept parallel_for_function = requires( const std::remove_reference_t<Function
 #endif // __TBB_CPP20_CONCEPTS_PRESENT
 namespace d1 {
 
-template<int Width, typename Range, typename Body>
+template<std::size_t Width, typename Range, typename Body>
 struct static_partitioner_for : public task {
-    Range my_range;
+    using Iter = typename Range::const_iterator;
+
+
+    Iter my_begin;
+    Iter my_end;
+    std::size_t grainsize{1};
+
     const Body my_body;
     node* my_parent;
 
-
-    static_partitioner::task_partition_type my_partition;
     small_object_allocator my_allocator;
 
-    static_partitioner_for(const Range& range, const Body& body, static_partitioner& partitioner, small_object_allocator& alloc) :
-        my_range(range),
+    std::size_t my_divisor;
+    std::size_t base_size;
+    std::size_t remain;
+
+    std::size_t my_head;
+    std::size_t my_max_affinity;
+
+
+    void offer_work(std::size_t num_tasks, execution_data& ed) {
+        small_object_allocator alloc{};
+        
+        std::size_t portion = my_divisor / num_tasks;
+        my_parent = alloc.new_object<tree_node>(ed, my_parent, int(num_tasks), alloc);
+        for (std::size_t i = 0; i < num_tasks-1; ++i) {
+            std::size_t block = base_size;
+            if (remain) {
+                ++block;
+                --remain;
+            }
+            static_partitioner_for& new_child = *alloc.new_object<static_partitioner_for>(ed, *this, block, portion, alloc);
+
+            new_child.my_parent = my_parent;
+            new_child.spawn_self(ed);
+        }
+    }
+
+    void spawn_self(execution_data& ed) {
+        task_group_context& ctx = *context(ed);
+        if (my_divisor) {
+            spawn(*this, ctx, slot_id(my_head));
+        } else {
+            spawn(*this, ctx);
+        }
+    }
+
+    std::size_t get_task_count() {
+        std::size_t task_count = Width;
+        while(my_divisor % task_count != 0) {
+            --task_count;
+        }
+        return task_count;
+    }
+
+    std::size_t range_size() {
+        return my_end-my_begin;
+    }
+
+    static_partitioner_for(const Iter begin, const Iter end, const Body& body, const static_partitioner&, small_object_allocator& alloc) :
+        my_begin(begin),
+        my_end(end),
         my_body(body),
-        my_partition(partitioner),
-        my_allocator(alloc) {}
+        my_allocator(alloc),
+        my_divisor(max_concurrency()), 
+        my_head(get_initial_partition_head()),
+        my_max_affinity(my_divisor) {}
+
+    static_partitioner_for(static_partitioner_for& parent, std::size_t block, std::size_t portion, small_object_allocator& alloc) : 
+        my_begin(parent.my_end-Iter(block)),
+        my_end(parent.my_end),
+        my_body(parent.my_body),
+        my_allocator(alloc),
+        my_max_affinity(parent.my_max_affinity)
+    {
+        my_divisor = portion;
+        parent.my_divisor -= portion;
+
+        my_head = (parent.my_head + parent.my_divisor) % parent.my_max_affinity;
+
+        parent.my_end = my_begin;
+    }
 
     task* execute(execution_data& ed) override {
 
-        // if ( range.is_divisible() ) {
-        //    if ( my_partition.is_divisible() ) {
-        //         do { // split until is divisible
-        //             auto split_obj = my_partition.template get_split<Range>();
-        //             start.offer_work( split_obj, ed );
-        //         } while ( range.is_divisible() && my_partition.is_divisible() );
-        //     }
-        // }
+        if ( range_size() > grainsize ) {
+            if ( my_divisor > 1 ) {
+                do {
+                    std::size_t num_tasks = get_task_count();
 
+                    base_size = range_size() / num_tasks;
+                    remain = range_size() % num_tasks;
+
+                    offer_work(num_tasks, ed);
+                } while ( range_size() > grainsize && my_divisor > 1 );
+            }
+        }
+
+        auto my_range = Range(my_begin, my_end);
         my_body(my_range);
 
         finalize(ed);
@@ -98,15 +172,15 @@ struct static_partitioner_for : public task {
         return nullptr;
     }
 
-    static void run(const Range& range, const Body& body, static_partitioner& partitioner) {
+    static void run(const Range& range, const Body& body, const static_partitioner& partitioner) {
         task_group_context context(PARALLEL_FOR);
         run(range, body, partitioner, context);
     }
 
-    static void run(const Range& range, const Body& body, static_partitioner& partitioner, task_group_context& context) {
+    static void run(const Range& range, const Body& body, const static_partitioner& partitioner, task_group_context& context) {
         if ( !range.empty() ) {
             small_object_allocator alloc{};
-            static_partitioner_for& for_task = *alloc.new_object<static_partitioner_for>(range, body, partitioner, alloc);
+            static_partitioner_for& for_task = *alloc.new_object<static_partitioner_for>(range.begin(), range.end(), body, partitioner, alloc);
 
             // defer creation of the wait node until task allocation succeeds
             wait_node wn;
@@ -321,8 +395,8 @@ void parallel_for( const Range& range, const Body& body, const auto_partitioner&
 template<typename Range, typename Body>
     __TBB_requires(tbb_range<Range> && parallel_for_body<Body, Range>)
 void parallel_for( const Range& range, const Body& body, const static_partitioner& partitioner ) {
-#if 0
-    static_partitioner_for<8, Range, Body, const static_partitioner>::run(range, body, partitioner);
+#if 1
+    static_partitioner_for<8ull, Range, Body>::run(range, body, partitioner);
 #else
     start_for<Range,Body,const static_partitioner>::run(range, body, partitioner);
 #endif
