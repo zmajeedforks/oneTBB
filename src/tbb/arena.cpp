@@ -316,7 +316,14 @@ bool arena::is_out_of_work() {
                 if (my_pool_state.load(std::memory_order_acquire) != busy)
                     return false; // the work was published
             }
-            bool work_absent = k == n;
+            bool mailboxes_empty = true;
+            for (unsigned int i = 0; i < my_num_slots; ++i) {
+                if (!mailbox(i).empty()) {
+                    mailboxes_empty = false;
+                    break;
+                }
+            }
+            bool work_absent = k == n && mailboxes_empty;
             // Test and test-and-set.
             if (my_pool_state.load(std::memory_order_acquire) == busy) {
                 bool no_stream_tasks = !has_enqueued_tasks() && my_resume_task_stream.empty();

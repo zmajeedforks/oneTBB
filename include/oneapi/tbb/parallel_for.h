@@ -64,6 +64,9 @@ namespace d1 {
 /** @ingroup algorithms */
 template<typename Range, typename Body, typename Partitioner>
 struct start_for : public task {
+    std::atomic_int my_state;
+    int max_references;
+
     Range my_range;
     const Body my_body;
     node* my_parent;
@@ -73,24 +76,32 @@ struct start_for : public task {
 
     task* execute(execution_data&) override;
     task* cancel(execution_data&) override;
+    task* lock(execution_data&) override;
+
     void finalize(const execution_data&);
 
     //! Constructor for root task.
-    start_for( const Range& range, const Body& body, Partitioner& partitioner, small_object_allocator& alloc ) :
+    start_for( const Range& range, const Body& body, Partitioner& partitioner, small_object_allocator& alloc, int ref_size = 1 ) :
+        my_state(1),
+        max_references(ref_size),
         my_range(range),
         my_body(body),
         my_partition(partitioner),
         my_allocator(alloc) {}
     //! Splitting constructor used to generate children.
     /** parent_ becomes left child.  Newly constructed object is right child. */
-    start_for( start_for& parent_, typename Partitioner::split_type& split_obj, small_object_allocator& alloc ) :
+    start_for( start_for& parent_, typename Partitioner::split_type& split_obj, small_object_allocator& alloc, int ref_size = 1 ) :
+        my_state(ref_size),
+        max_references(ref_size),
         my_range(parent_.my_range, get_range_split_object<Range>(split_obj)),
         my_body(parent_.my_body),
         my_partition(parent_.my_partition, split_obj),
         my_allocator(alloc) {}
     //! Construct right child from the given range as response to the demand.
     /** parent_ remains left child.  Newly constructed object is right child. */
-    start_for( start_for& parent_, const Range& r, depth_t d, small_object_allocator& alloc ) :
+    start_for( start_for& parent_, const Range& r, depth_t d, small_object_allocator& alloc, int ref_size = 1 ) :
+        my_state(ref_size),
+        max_references(ref_size),
         my_range(r),
         my_body(parent_.my_body),
         my_partition(parent_.my_partition, split()),
@@ -98,15 +109,15 @@ struct start_for : public task {
     {
         my_partition.align_depth( d );
     }
-    static void run(const Range& range, const Body& body, Partitioner& partitioner) {
+    static void run(const Range& range, const Body& body, Partitioner& partitioner, int ref_size = 1) {
         task_group_context context(PARALLEL_FOR);
-        run(range, body, partitioner, context);
+        run(range, body, partitioner, context, ref_size);
     }
 
-    static void run(const Range& range, const Body& body, Partitioner& partitioner, task_group_context& context) {
+    static void run(const Range& range, const Body& body, Partitioner& partitioner, task_group_context& context, int ref_size = 1) {
         if ( !range.empty() ) {
             small_object_allocator alloc{};
-            start_for& for_task = *alloc.new_object<start_for>(range, body, partitioner, alloc);
+            start_for& for_task = *alloc.new_object<start_for>(range, body, partitioner, alloc, ref_size);
 
             // defer creation of the wait node until task allocation succeeds
             wait_node wn;
@@ -134,7 +145,7 @@ private:
     void offer_work_impl(execution_data& ed, Args&&... constructor_args) {
         // New right child
         small_object_allocator alloc{};
-        start_for& right_child = *alloc.new_object<start_for>(ed, std::forward<Args>(constructor_args)..., alloc);
+        start_for& right_child = *alloc.new_object<start_for>(ed, std::forward<Args>(constructor_args)..., alloc, this->max_references);
 
         // New root node as a continuation and ref count. Left and right child attach to the new parent.
         right_child.my_parent = my_parent = alloc.new_object<tree_node>(ed, my_parent, 2, alloc);
@@ -170,14 +181,38 @@ task* start_for<Range, Body, Partitioner>::execute(execution_data& ed) {
     }
     my_partition.check_being_stolen(*this, ed);
     my_partition.execute(*this, my_range, ed);
-    finalize(ed);
+    fold_tree<tree_node>(my_parent, ed);
+    if (--my_state == 0) {
+        this->~start_for();
+        my_allocator.deallocate(this, ed);
+    }
     return nullptr;
 }
 
 //! cancel task for parallel_for
 template<typename Range, typename Body, typename Partitioner>
 task* start_for<Range, Body, Partitioner>::cancel(execution_data& ed) {
-    finalize(ed);
+    // finalize(ed);
+    fold_tree<tree_node>(my_parent, ed);
+    if (--my_state == 0) {
+        this->~start_for();
+        my_allocator.deallocate(this, ed);
+    }
+    return nullptr;
+}
+
+//! Try lock task
+template<typename Range, typename Body, typename Partitioner>
+task* start_for<Range, Body, Partitioner>::lock(execution_data& ed) {
+    auto snapshot = my_state--;
+    if (snapshot == max_references) {
+        return this;
+    } else {
+        if (snapshot == 1) {
+            this->~start_for();
+            my_allocator.deallocate(this, ed);
+        }
+    }
     return nullptr;
 }
 
@@ -252,7 +287,7 @@ void parallel_for( const Range& range, const Body& body, const auto_partitioner&
 template<typename Range, typename Body>
     __TBB_requires(tbb_range<Range> && parallel_for_body<Body, Range>)
 void parallel_for( const Range& range, const Body& body, const static_partitioner& partitioner ) {
-    start_for<Range,Body,const static_partitioner>::run(range,body,partitioner);
+    start_for<Range,Body,const static_partitioner>::run(range,body,partitioner, 3);
 }
 
 //! Parallel iteration over range with affinity_partitioner.
@@ -260,7 +295,7 @@ void parallel_for( const Range& range, const Body& body, const static_partitione
 template<typename Range, typename Body>
     __TBB_requires(tbb_range<Range> && parallel_for_body<Body, Range>)
 void parallel_for( const Range& range, const Body& body, affinity_partitioner& partitioner ) {
-    start_for<Range,Body,affinity_partitioner>::run(range,body,partitioner);
+    start_for<Range,Body,affinity_partitioner>::run(range,body,partitioner, 3);
 }
 
 //! Parallel iteration over range with default partitioner and user-supplied context.
@@ -292,7 +327,7 @@ void parallel_for( const Range& range, const Body& body, const auto_partitioner&
 template<typename Range, typename Body>
     __TBB_requires(tbb_range<Range> && parallel_for_body<Body, Range>)
 void parallel_for( const Range& range, const Body& body, const static_partitioner& partitioner, task_group_context& context ) {
-    start_for<Range,Body,const static_partitioner>::run(range, body, partitioner, context);
+    start_for<Range,Body,const static_partitioner>::run(range, body, partitioner, context, 3);
 }
 
 //! Parallel iteration over range with affinity_partitioner and user-supplied context.
@@ -300,7 +335,7 @@ void parallel_for( const Range& range, const Body& body, const static_partitione
 template<typename Range, typename Body>
     __TBB_requires(tbb_range<Range> && parallel_for_body<Body, Range>)
 void parallel_for( const Range& range, const Body& body, affinity_partitioner& partitioner, task_group_context& context ) {
-    start_for<Range,Body,affinity_partitioner>::run(range,body,partitioner, context);
+    start_for<Range,Body,affinity_partitioner>::run(range,body,partitioner, context, 3);
 }
 
 //! Implementation of parallel iteration over stepped range of integers with explicit step and partitioner
