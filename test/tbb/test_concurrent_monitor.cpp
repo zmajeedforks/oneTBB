@@ -24,7 +24,6 @@
 #endif
 
 #define TBB_PREVIEW_MUTEXES 1
-#define TBB_PREVIEW_WAITING_FOR_WORKERS 1
 
 #include "common/test.h"
 #include "common/utils.h"
@@ -52,7 +51,7 @@ TEST_CASE("Stress test") {
     std::size_t threads_number = utils::get_platform_max_threads();
 
     // Need to prolong lifetime of the exposed concurrent_monitor
-    tbb::task_scheduler_handle handler = tbb::task_scheduler_handle::get();
+    tbb::task_scheduler_handle handler{tbb::attach{}};
 
     utils::SpinBarrier barrier(threads_number);
 

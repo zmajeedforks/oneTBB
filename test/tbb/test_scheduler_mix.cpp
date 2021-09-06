@@ -15,7 +15,6 @@
 */
 
 #define TBB_PREVIEW_MUTEXES 1
-#define TBB_PREVIEW_WAITING_FOR_WORKERS 1
 #define TBB_PREVIEW_TASK_GROUP_EXTENSIONS 1
 
 #include "common/config.h"
