@@ -142,10 +142,15 @@ namespace utils {
 
     inline bool isTHPEnabledOnMachine() {
         unsigned long long thpPresent = 'n';
-        parseFileItem thpItem[] = { { "[alwa%cs] madvise never\n", thpPresent } };
-        parseFile</*BUFF_SIZE=*/100>("/sys/kernel/mm/transparent_hugepage/enabled", thpItem);
+        unsigned long long hugePageSizePresent = 0;
 
-        if (thpPresent == 'y') {
+        parseFileItem thpItem[] = { { "[alwa%cs] madvise never\n", thpPresent } };
+        parseFileItem hpSizeItem[] = { { "Hugepagesiz%c:", hugePageSizePresent } };
+
+        parseFile</*BUFF_SIZE=*/100>("/sys/kernel/mm/transparent_hugepage/enabled", thpItem);
+        parseFile</*BUFF_SIZE=*/100>("/proc/meminfo", hpSizeItem);
+
+        if (hugePageSizePresent == 'e' && thpPresent == 'y') {
             return true;
         } else {
             return false;
