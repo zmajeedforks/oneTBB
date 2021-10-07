@@ -195,7 +195,7 @@
 
 /** __TBB_WEAK_SYMBOLS_PRESENT denotes that the system supports the weak symbol mechanism **/
 #ifndef __TBB_WEAK_SYMBOLS_PRESENT
-    #define __TBB_WEAK_SYMBOLS_PRESENT ( !_WIN32 && !__APPLE__ && !__sun && (__TBB_GCC_VERSION >= 40000 || __INTEL_COMPILER ) )
+    #define __TBB_WEAK_SYMBOLS_PRESENT ( !_WIN32 && !__APPLE__ && !__sun && !__CYGWIN__ && (__TBB_GCC_VERSION >= 40000 || __INTEL_COMPILER ) )
 #endif
 
 /** Presence of compiler features **/
@@ -386,7 +386,8 @@
 #endif
 
 #if !defined(__TBB_SURVIVE_THREAD_SWITCH) && \
-          (_WIN32 || _WIN64 || __APPLE__ || (__unix__ && !__ANDROID__))
+          (_WIN32 || _WIN64 || __APPLE__ || __CYGWIN__ || (__unix__ && !__ANDROID__))
+
     #define __TBB_SURVIVE_THREAD_SWITCH 1
 #endif /* __TBB_SURVIVE_THREAD_SWITCH */
 

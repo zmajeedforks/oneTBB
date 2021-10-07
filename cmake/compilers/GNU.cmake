@@ -21,6 +21,10 @@ elseif (APPLE)
 
     # For correct ucontext.h structures layout
     set(TBB_COMMON_COMPILE_FLAGS ${TBB_COMMON_COMPILE_FLAGS} -D_XOPEN_SOURCE)
+elseif (CYGWIN)
+    set(TBB_COMMON_COMPILE_FLAGS ${TBB_COMMON_COMPILE_FLAGS} -D_POSIX_C_SOURCE=200809L)
+    set(TBB_LINK_DEF_FILE_FLAG -Wl,--version-script=)
+    set(TBB_DEF_FILE_PREFIX lin${TBB_ARCH})
 else()
     set(TBB_LINK_DEF_FILE_FLAG -Wl,--version-script=)
     set(TBB_DEF_FILE_PREFIX lin${TBB_ARCH})

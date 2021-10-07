@@ -39,6 +39,12 @@
     #define PATH_MAX                MAX_PATH
 #endif
 #else /* _WIN32 */
+    // for cygwin implementation of dladdr and Dl_info in /usr/include/dlfcn.h
+    #if __CYGWIN__
+        #undef __GNU_VISIBLE
+        #define __GNU_VISIBLE 1
+    #endif
+
     #include <dlfcn.h>
     #include <unistd.h>
 

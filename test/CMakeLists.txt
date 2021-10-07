@@ -526,6 +526,24 @@ if (TARGET TBB::tbb)
         LINK_OPTIONS /LIBPATH:$<TARGET_LINKER_FILE_DIR:TBB::tbb>)
         add_dependencies(test_implicit_linkage_on_windows TBB::tbb)
     endif()
+    # these files need -O3 to fix assembler errors for too many sections, file too big
+    if (CYGWIN)
+        set_source_files_properties(
+            tbb/test_concurrent_unordered_map.cpp
+            tbb/test_concurrent_unordered_set.cpp
+            tbb/test_concurrent_map.cpp
+            tbb/test_concurrent_set.cpp
+            tbb/test_join_node.cpp
+            tbb/test_parallel_pipeline.cpp
+            tbb/test_concurrent_hash_map.cpp
+            tbb/test_eh_flow_graph.cpp
+            tbb/test_join_node_key_matching.cpp
+            tbb/test_join_node_msg_key_matching.cpp
+            conformance/conformance_concurrent_unordered_map.cpp
+            conformance/conformance_concurrent_map.cpp
+            PROPERTIES COMPILE_OPTIONS -O3
+        )
+    endif()
 endif()
 
 if (TARGET TBB::tbbmalloc)
