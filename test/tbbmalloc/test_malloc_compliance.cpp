@@ -35,70 +35,7 @@
 
 #include <vector>
 
-#if _WIN32 || _WIN64
-/**
- *  _WIN32_WINNT should be defined at the very beginning,
- *  because other headers might include <windows.h>
- **/
-#undef _WIN32_WINNT
-#define _WIN32_WINNT 0x0501
-#include <windows.h>
-#include <stdio.h>
-
-#if _MSC_VER && defined(_MT) && defined(_DLL)
-    #pragma comment(lib, "version.lib")  // to use GetFileVersionInfo*
-#endif
-
-void limitMem( size_t limit )
-{
-    static HANDLE hJob = NULL;
-    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInfo;
-
-    jobInfo.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_PROCESS_MEMORY;
-    jobInfo.ProcessMemoryLimit = limit? limit*MByte : 2*MByte*1024;
-    if (NULL == hJob) {
-        if (NULL == (hJob = CreateJobObject(NULL, NULL))) {
-            REPORT("Can't assign create job object: %ld\n", GetLastError());
-            exit(1);
-        }
-        if (0 == AssignProcessToJobObject(hJob, GetCurrentProcess())) {
-            REPORT("Can't assign process to job object: %ld\n", GetLastError());
-            exit(1);
-        }
-    }
-    if (0 == SetInformationJobObject(hJob, JobObjectExtendedLimitInformation,
-                                     &jobInfo, sizeof(jobInfo))) {
-        REPORT("Can't set limits: %ld\n", GetLastError());
-        exit(1);
-    }
-}
-// Do not test errno with static VC runtime
-#else // _WIN32 || _WIN64
-#include <sys/resource.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
-#include <sys/types.h>  // uint64_t on FreeBSD, needed for rlim_t
-#include <stdint.h>     // SIZE_MAX
-
-void limitMem( size_t limit )
-{
-    rlimit rlim;
-    int ret = getrlimit(RLIMIT_AS,&rlim);
-    if (0 != ret) {
-        REPORT("getrlimit() returned an error: errno %d\n", errno);
-        exit(1);
-    }
-    if (rlim.rlim_max==(rlim_t)RLIM_INFINITY)
-        rlim.rlim_cur = (limit > 0) ? limit*MByte : rlim.rlim_max;
-    else rlim.rlim_cur = (limit > 0 && static_cast<rlim_t>(limit)<rlim.rlim_max) ? limit*MByte : rlim.rlim_max;
-    ret = setrlimit(RLIMIT_AS,&rlim);
-    if (0 != ret) {
-        REPORT("Can't set limits: errno %d\n", errno);
-        exit(1);
-    }
-}
-#endif  // _WIN32 || _WIN64
+void limitMem( size_t limit );
 
 bool __tbb_test_errno = false;
 
@@ -116,7 +53,7 @@ static bool Verbose = false;
 #if __unix__
 #include <stdint.h> // uintptr_t
 #endif
-#if _WIN32 || _WIN64
+#if defined(_WIN32) || defined(_WIN64)
 #include <malloc.h> // _aligned_(malloc|free|realloc)
 #if __MINGW64__
 // Workaround a bug in MinGW64 headers with _aligned_(malloc|free) not declared by default
@@ -136,7 +73,7 @@ const char strOk[]="done";
 
 typedef unsigned int UINT;
 typedef unsigned char UCHAR;
-typedef unsigned long DWORD;
+typedef unsigned long TBB_DWORD;
 typedef unsigned char BYTE;
 
 typedef void* TestMalloc(size_t size);
@@ -431,8 +368,8 @@ size_t NonZero(void *ptr, size_t size)
 
 struct TestStruct
 {
-    DWORD field1:2;
-    DWORD field2:6;
+    TBB_DWORD field1:2;
+    TBB_DWORD field2:6;
     double field3;
     UCHAR field4[100];
     TestStruct* field5;
@@ -1091,3 +1028,120 @@ TEST_CASE("MAIN TEST") {
 }
 
 #endif /* __TBB_WIN8UI_SUPPORT	 */
+
+#if _WIN32 || _WIN64 || __CYGWIN__
+/**
+ *  _WIN32_WINNT should be defined at the very beginning,
+ *  because other headers might include <windows.h>
+ **/
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0501
+#include <windows.h>
+#include <stdio.h>
+
+#if _MSC_VER && defined(_MT) && defined(_DLL)
+    #pragma comment(lib, "version.lib")  // to use GetFileVersionInfo*
+#endif
+
+void limitMem( size_t limit )
+{
+    static HANDLE hJob = NULL;
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobInfo;
+
+    jobInfo.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_PROCESS_MEMORY;
+    jobInfo.ProcessMemoryLimit = limit? limit*MByte : 2*MByte*1024;
+    if (NULL == hJob) {
+        if (NULL == (hJob = CreateJobObject(NULL, NULL))) {
+            REPORT("Can't assign create job object: %ld\n", GetLastError());
+            exit(1);
+        }
+        if (0 == AssignProcessToJobObject(hJob, GetCurrentProcess())) {
+            REPORT("Can't assign process to job object: %ld\n", GetLastError());
+            exit(1);
+        }
+    }
+    if (0 == SetInformationJobObject(hJob, JobObjectExtendedLimitInformation,
+                                     &jobInfo, sizeof(jobInfo))) {
+        REPORT("Can't set limits: %ld\n", GetLastError());
+        exit(1);
+    }
+}
+// Do not test errno with static VC runtime
+#else // _WIN32 || _WIN64
+#include <sys/resource.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
+#include <sys/types.h>  // uint64_t on FreeBSD, needed for rlim_t
+#include <stdint.h>     // SIZE_MAX
+
+void limitMem( size_t limit )
+{
+    rlimit rlim;
+    int ret = getrlimit(RLIMIT_AS,&rlim);
+    if (0 != ret) {
+        REPORT("getrlimit() returned an error: errno %d\n", errno);
+        exit(1);
+    }
+    if (rlim.rlim_max==(rlim_t)RLIM_INFINITY)
+        rlim.rlim_cur = (limit > 0) ? limit*MByte : rlim.rlim_max;
+    else rlim.rlim_cur = (limit > 0 && static_cast<rlim_t>(limit)<rlim.rlim_max) ? limit*MByte : rlim.rlim_max;
+    ret = setrlimit(RLIMIT_AS,&rlim);
+    if (0 != ret) {
+        REPORT("Can't set limits: errno %d\n", errno);
+        exit(1);
+    }
+}
+#endif  // _WIN32 || _WIN64
+
+#if __CYGWIN__
+namespace utils {
+
+    //! Return estimate of number of bytes of memory that this program is currently using.
+    /* Returns 0 if not implemented on platform. */
+    std::size_t GetMemoryUsage(MemoryStatType stat) {
+        utils::suppress_unused_warning(stat);
+#if __TBB_WIN8UI_SUPPORT || defined(WINAPI_FAMILY)
+        return 0;
+#elif _WIN32 || __CYGWIN__
+        PROCESS_MEMORY_COUNTERS mem;
+        bool status = GetProcessMemoryInfo(GetCurrentProcess(), &mem, sizeof(mem)) != 0;
+        ASSERT(status, NULL);
+        return stat == currentUsage ? mem.PagefileUsage : mem.PeakPagefileUsage;
+#elif __unix__
+        long unsigned size = 0;
+        FILE* fst = fopen("/proc/self/status", "r");
+        ASSERT(fst != nullptr, NULL);
+        const int BUF_SZ = 200;
+        char buf_stat[BUF_SZ];
+        const char* pattern = stat == peakUsage ? "VmPeak: %lu" : "VmSize: %lu";
+        while (NULL != fgets(buf_stat, BUF_SZ, fst)) {
+            if (1 == sscanf(buf_stat, pattern, &size)) {
+                ASSERT(size, "Invalid value of memory consumption.");
+                break;
+            }
+        }
+        // VmPeak is available in kernels staring 2.6.15
+        if (stat != peakUsage || LinuxKernelVersion() >= 2006015) {
+          fprintf(stderr, "stat %d peakUsage %d LinuxKernelVersion %d\n", stat, peakUsage, LinuxKernelVersion());
+            ASSERT(size, "Invalid /proc/self/status format, pattern not found.");
+        }
+        fclose(fst);
+        return size * 1024;
+#elif __APPLE__ && !__ARM_ARCH
+        // TODO: find how detect peak virtual memory size under macOS
+        if (stat == peakUsage)
+            return 0;
+        kern_return_t status;
+        task_basic_info info;
+        mach_msg_type_number_t msg_type = TASK_BASIC_INFO_COUNT;
+        status = task_info(mach_task_self(), TASK_BASIC_INFO, reinterpret_cast<task_info_t>(&info), &msg_type);
+        ASSERT(status == KERN_SUCCESS, NULL);
+        return info.virtual_size - shared_size;
+#else
+        return 0;
+#endif
+    }
+
+} // namespace utils
+#endif

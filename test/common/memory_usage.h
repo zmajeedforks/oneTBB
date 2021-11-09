@@ -84,6 +84,9 @@ namespace utils {
 
     //! Return estimate of number of bytes of memory that this program is currently using.
     /* Returns 0 if not implemented on platform. */
+#if __CYGWIN__
+    std::size_t GetMemoryUsage(MemoryStatType stat = currentUsage);
+#else
     std::size_t GetMemoryUsage(MemoryStatType stat = currentUsage) {
         utils::suppress_unused_warning(stat);
 #if __TBB_WIN8UI_SUPPORT || defined(WINAPI_FAMILY)
@@ -125,6 +128,7 @@ namespace utils {
         return 0;
 #endif
     }
+#endif
 
     //! Use approximately a specified amount of stack space.
     /** Recursion is used here instead of alloca because some implementations of alloca do not use the stack. */

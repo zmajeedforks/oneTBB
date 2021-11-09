@@ -30,6 +30,8 @@ enum FOO_TYPE {
 
 #if _WIN32 || _WIN64
 #define TEST_EXPORT
+#elif __CYGWIN__
+  #define TEST_EXPORT extern "C"  __attribute__((dllexport))
 #else
 #define TEST_EXPORT extern "C"
 #endif /* _WIN32 || _WIN64 */

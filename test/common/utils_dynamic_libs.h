@@ -32,7 +32,13 @@ namespace utils {
 
 #if TBB_USE_DEBUG
 #define SUFFIX1 "_debug"
-#define SUFFIX2
+
+  #if __CYGWIN__
+    #define SUFFIX2 "_debug-2"
+  #else
+    #define SUFFIX2
+  #endif
+
 #else
 #define SUFFIX1
 #define SUFFIX2 "_debug"
@@ -45,18 +51,23 @@ namespace utils {
     #define PREFIX
 #endif
 #define EXT ".dll"
+#elif __CYGWIN__
+  #define PREFIX "cyg"
 #else
 #define PREFIX "lib"
+#endif
+
 #if __APPLE__
 #define EXT ".dylib"
 // Android SDK build system does not support .so file name versioning
 #elif __FreeBSD__ || __NetBSD__ || __sun || _AIX || __ANDROID__
 #define EXT ".so"
+#elif __CYGWIN__
+  #define EXT ".dll"
 #elif __unix__  // Order of these elif's matters!
 #define EXT __TBB_STRING(.so.2)
 #else
 #error Unknown OS
-#endif
 #endif
 
 // Form the names of the TBB memory allocator binaries.
@@ -71,6 +82,8 @@ using LIBRARY_HANDLE = void*;
 
 #if _WIN32 || _WIN64
 #define TEST_LIBRARY_NAME(base) PREFIX base SUFFIX1 ".dll"
+#elif __CYGWIN__
+  #define TEST_LIBRARY_NAME(base) PREFIX base SUFFIX1 ".dll"
 #elif __APPLE__
 #define TEST_LIBRARY_NAME(base) PREFIX base SUFFIX1 ".dylib"
 #else
