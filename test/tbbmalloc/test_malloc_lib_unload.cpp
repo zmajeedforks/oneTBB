@@ -124,6 +124,9 @@ int main() {}
 // For sanitizers, it fails because RUNPATH is lost: https://github.com/google/sanitizers/issues/1219
 #else
 #include "common/test.h"
+#if __CYGWIN__
+  #define TBB_CYGWIN_USE_WIN32 1
+#endif
 #include "common/memory_usage.h"
 #include "common/utils_dynamic_libs.h"
 #include "common/utils_assert.h"

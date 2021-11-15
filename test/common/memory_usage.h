@@ -84,7 +84,7 @@ namespace utils {
 
     //! Return estimate of number of bytes of memory that this program is currently using.
     /* Returns 0 if not implemented on platform. */
-#if __CYGWIN__
+#if TBB_CYGWIN_USE_WIN32
     std::size_t GetMemoryUsage(MemoryStatType stat = currentUsage);
 #else
     std::size_t GetMemoryUsage(MemoryStatType stat = currentUsage) {

@@ -41,6 +41,8 @@ namespace internal {
 // MALLOCLIB_NAME is the name of the oneTBB memory allocator library.
 #if _WIN32||_WIN64
 #define MALLOCLIB_NAME "tbbmalloc" DEBUG_SUFFIX ".dll"
+#elif __CYGWIN__
+#define MALLOCLIB_NAME "cygtbbmalloc" DEBUG_SUFFIX "-2" ".dll"
 #elif __APPLE__
 #define MALLOCLIB_NAME "libtbbmalloc" DEBUG_SUFFIX ".dylib"
 #elif __FreeBSD__ || __NetBSD__ || __OpenBSD__ || __sun || _AIX || __ANDROID__

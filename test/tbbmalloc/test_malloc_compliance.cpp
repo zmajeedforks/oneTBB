@@ -26,6 +26,9 @@
 #include "common/utils.h"
 #include "common/utils_report.h"
 #include "common/spin_barrier.h"
+#if __CYGWIN__
+  #define TBB_CYGWIN_USE_WIN32 1
+#endif
 #include "common/memory_usage.h"
 
 #include "oneapi/tbb/detail/_config.h"

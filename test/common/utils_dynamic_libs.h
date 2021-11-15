@@ -46,28 +46,26 @@ namespace utils {
 
 #if (_WIN32||_WIN64)
 #if __MINGW32__
-    #define PREFIX "lib"
+#define PREFIX "lib"
 #else
-    #define PREFIX
+#define PREFIX
 #endif
 #define EXT ".dll"
 #elif __CYGWIN__
-  #define PREFIX "cyg"
+#define PREFIX "cyg"
+#define EXT ".dll"
 #else
 #define PREFIX "lib"
-#endif
-
 #if __APPLE__
 #define EXT ".dylib"
 // Android SDK build system does not support .so file name versioning
 #elif __FreeBSD__ || __NetBSD__ || __sun || _AIX || __ANDROID__
 #define EXT ".so"
-#elif __CYGWIN__
-  #define EXT ".dll"
 #elif __unix__  // Order of these elif's matters!
 #define EXT __TBB_STRING(.so.2)
 #else
 #error Unknown OS
+#endif
 #endif
 
 // Form the names of the TBB memory allocator binaries.
