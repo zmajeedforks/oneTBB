@@ -250,9 +250,10 @@ endfunction()
 
 function(tbb_add_tbbbind_test)
     set(oneValueArgs SUBDIR NAME)
+    set(multiValueArgs DEPENDENCIES)
     cmake_parse_arguments(_tbbbind_test "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-    tbb_add_test(SUBDIR ${_tbbbind_test_SUBDIR} NAME ${_tbbbind_test_NAME} DEPENDENCIES TBB::tbb)
+    tbb_add_test(SUBDIR ${_tbbbind_test_SUBDIR} NAME ${_tbbbind_test_NAME} DEPENDENCIES TBB::tbb ${_tbbbind_test_DEPENDENCIES})
     add_dependencies(test_suite_arena_constraints ${_tbbbind_test_NAME})
 
     set_property(TEST ${_tbbbind_test_NAME} PROPERTY ENVIRONMENT TBB_VERSION=1 APPEND)
@@ -381,13 +382,13 @@ if (TARGET TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_parallel_for_each DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_parallel_reduce DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_parallel_sort DEPENDENCIES TBB::tbb)
-    tbb_add_test(SUBDIR tbb NAME test_parallel_invoke DEPENDENCIES TBB::tbb)
+    tbb_add_test(SUBDIR tbb NAME test_parallel_invoke DEPENDENCIES TBB::tbb memory_usage)
     tbb_add_test(SUBDIR tbb NAME test_parallel_scan DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_parallel_pipeline DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_eh_algorithms DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_blocked_range DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_concurrent_vector DEPENDENCIES TBB::tbb)
-    tbb_add_test(SUBDIR tbb NAME test_task_group DEPENDENCIES TBB::tbb)
+    tbb_add_test(SUBDIR tbb NAME test_task_group DEPENDENCIES TBB::tbb memory_usage)
     tbb_add_test(SUBDIR tbb NAME test_concurrent_hash_map DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_task_arena DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_enumerable_thread_specific DEPENDENCIES TBB::tbb)
@@ -438,7 +439,7 @@ if (TARGET TBB::tbb)
     )
 
     # HWLOC related test
-    tbb_add_tbbbind_test(SUBDIR tbb NAME test_arena_constraints)
+    tbb_add_tbbbind_test(SUBDIR tbb NAME test_arena_constraints DEPENDENCIES memory_usage)
 
     if (NOT "${CMAKE_SYSTEM_PROCESSOR}" MATCHES "mips")
         # TODO: Fix for MIPS
@@ -553,18 +554,18 @@ if (TARGET TBB::tbbmalloc)
         tbb_add_test(SUBDIR tbbmalloc NAME test_scalable_allocator DEPENDENCIES TBB::tbbmalloc)
         tbb_add_test(SUBDIR tbbmalloc NAME test_malloc_pools DEPENDENCIES TBB::tbbmalloc)
         tbb_add_test(SUBDIR tbbmalloc NAME test_malloc_init_shutdown DEPENDENCIES TBB::tbbmalloc)
-        tbb_add_test(SUBDIR tbbmalloc NAME test_malloc_regression DEPENDENCIES TBB::tbbmalloc)
+        tbb_add_test(SUBDIR tbbmalloc NAME test_malloc_regression DEPENDENCIES TBB::tbb TBB::tbbmalloc memory_usage)
         if (TARGET TBB::tbb)
             tbb_add_test(SUBDIR tbbmalloc NAME test_malloc_shutdown_hang DEPENDENCIES TBB::tbb TBB::tbbmalloc)
         endif()
 
         if (NOT (WINDOWS_STORE OR TBB_WINDOWS_DRIVER))
             # TODO: Consider adding following tests on WINDOWS_STORE and TBB_WINDOWS_DRIVER platforms
-            tbb_add_test(SUBDIR tbbmalloc NAME test_malloc_compliance DEPENDENCIES TBB::tbbmalloc)
+            tbb_add_test(SUBDIR tbbmalloc NAME test_malloc_compliance DEPENDENCIES TBB::tbb TBB::tbbmalloc memory_usage)
             tbb_add_lib_test(SUBDIR tbbmalloc NAME test_malloc_used_by_lib DEPENDENCIES TBB::tbbmalloc)
-            tbb_add_test(SUBDIR tbbmalloc NAME test_malloc_used_by_lib DEPENDENCIES _test_malloc_used_by_lib)
+            tbb_add_test(SUBDIR tbbmalloc NAME test_malloc_used_by_lib DEPENDENCIES _test_malloc_used_by_lib TBB::tbb memory_usage)
             tbb_add_lib_test(SUBDIR tbbmalloc NAME test_malloc_lib_unload)
-            tbb_add_test(SUBDIR tbbmalloc NAME test_malloc_lib_unload DEPENDENCIES _test_malloc_lib_unload)
+            tbb_add_test(SUBDIR tbbmalloc NAME test_malloc_lib_unload DEPENDENCIES _test_malloc_lib_unload TBB::tbb memory_usage)
         endif()
 
         enable_language(C)
@@ -604,7 +605,7 @@ if (TARGET TBB::tbbmalloc)
         else()
             target_link_libraries(test_malloc_whitebox PRIVATE ${TBB_COMMON_LINK_FLAGS})
         endif()
-        target_link_libraries(test_malloc_whitebox PRIVATE Threads::Threads ${TBB_COMMON_LINK_LIBS})
+        target_link_libraries(test_malloc_whitebox PRIVATE Threads::Threads ${TBB_COMMON_LINK_LIBS} TBB::tbb memory_usage)
 
         # ------------------------------------------------------------------------------------------
 
@@ -630,6 +631,8 @@ if (TARGET TBB::tbbmalloc)
         endif()
     endif()
 endif()
+
+add_subdirectory(common/memory_usage)
 
 unset(HWLOC_2_5_TESTS_STATUS_SHOWN)
 unset(HWLOC_2_TESTS_STATUS_SHOWN)

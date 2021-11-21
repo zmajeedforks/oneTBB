@@ -1243,7 +1243,7 @@ void TestSlabAlignment() {
     }
 }
 
-#include "common/memory_usage.h"
+#include "common/memory_usage/memory_usage.h"
 
 // TODO: Consider adding Huge Pages support on macOS (special mmap flag).
 // Transparent Huge pages support could be enabled by different system parsing mechanism,

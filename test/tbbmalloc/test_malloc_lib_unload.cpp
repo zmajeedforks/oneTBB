@@ -23,7 +23,7 @@
 
 const char *globalCallMsg = "A TBB allocator function call is resolved into wrong implementation.";
 
-#if _WIN32||_WIN64
+#if _WIN32||_WIN64 || __CYGWIN__
 // must be defined in DLL for linker to not drop the dependency on the DLL.
 extern "C" {
     extern __declspec(dllexport) void *scalable_malloc(size_t);
@@ -124,22 +124,19 @@ int main() {}
 // For sanitizers, it fails because RUNPATH is lost: https://github.com/google/sanitizers/issues/1219
 #else
 #include "common/test.h"
-#if __CYGWIN__
-  #define TBB_CYGWIN_USE_WIN32 1
-#endif
-#include "common/memory_usage.h"
+#include "common/memory_usage/memory_usage.h"
 #include "common/utils_dynamic_libs.h"
 #include "common/utils_assert.h"
 #include "common/utils_report.h"
 #include <cstring> // memset
 
 extern "C" {
-#if _WIN32||_WIN64
+#if _WIN32||_WIN64 || __CYGWIN__
     extern __declspec(dllimport)
 #endif
     void *scalable_malloc(size_t);
 
-#if _WIN32||_WIN64
+#if _WIN32||_WIN64 || __CYGWIN__
     extern __declspec(dllimport)
 #endif
     int anchor();
@@ -222,62 +219,5 @@ TEST_CASE("test unload lib") {
 }
 
 #endif /* Unsupported configurations */
-
-#if __CYGWIN__
-
-#include <windows.h>
-#include <psapi.h>
-
-namespace utils {
-
-    //! Return estimate of number of bytes of memory that this program is currently using.
-    /* Returns 0 if not implemented on platform. */
-    std::size_t GetMemoryUsage(MemoryStatType stat) {
-        utils::suppress_unused_warning(stat);
-#if __TBB_WIN8UI_SUPPORT || defined(WINAPI_FAMILY)
-        return 0;
-//#elif _WIN32
-#elif _WIN32 || __CYGWIN__
-        PROCESS_MEMORY_COUNTERS mem;
-        bool status = GetProcessMemoryInfo(GetCurrentProcess(), &mem, sizeof(mem)) != 0;
-        ASSERT(status, NULL);
-        return stat == currentUsage ? mem.PagefileUsage : mem.PeakPagefileUsage;
-#elif __unix__
-        long unsigned size = 0;
-        FILE* fst = fopen("/proc/self/status", "r");
-        ASSERT(fst != nullptr, NULL);
-        const int BUF_SZ = 200;
-        char buf_stat[BUF_SZ];
-        const char* pattern = stat == peakUsage ? "VmPeak: %lu" : "VmSize: %lu";
-        while (NULL != fgets(buf_stat, BUF_SZ, fst)) {
-            if (1 == sscanf(buf_stat, pattern, &size)) {
-                ASSERT(size, "Invalid value of memory consumption.");
-                break;
-            }
-        }
-        // VmPeak is available in kernels staring 2.6.15
-        if (stat != peakUsage || LinuxKernelVersion() >= 2006015) {
-          fprintf(stderr, "stat %d peakUsage %d LinuxKernelVersion %d\n", stat, peakUsage, LinuxKernelVersion());
-            ASSERT(size, "Invalid /proc/self/status format, pattern not found.");
-        }
-        fclose(fst);
-        return size * 1024;
-#elif __APPLE__ && !__ARM_ARCH
-        // TODO: find how detect peak virtual memory size under macOS
-        if (stat == peakUsage)
-            return 0;
-        kern_return_t status;
-        task_basic_info info;
-        mach_msg_type_number_t msg_type = TASK_BASIC_INFO_COUNT;
-        status = task_info(mach_task_self(), TASK_BASIC_INFO, reinterpret_cast<task_info_t>(&info), &msg_type);
-        ASSERT(status == KERN_SUCCESS, NULL);
-        return info.virtual_size - shared_size;
-#else
-        return 0;
-#endif
-    }
-
-} // namespace utils
-#endif
 
 #endif // _USRDLL

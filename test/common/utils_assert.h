@@ -24,6 +24,7 @@
 
 namespace utils {
 
+inline
 void ReportError( const char* filename, int line, const char* expression, const char * message ) {
     print_call_stack();
     REPORT_FATAL_ERROR("%s:%d, assertion %s: %s\n", filename, line, expression, message ? message : "failed" );

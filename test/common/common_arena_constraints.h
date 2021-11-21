@@ -26,7 +26,7 @@
 #include "common/test.h"
 #include "common/spin_barrier.h"
 #include "common/utils.h"
-#include "common/memory_usage.h"
+#include "common/memory_usage/memory_usage.h"
 #include "common/utils_concurrency_limit.h"
 
 #include "oneapi/tbb/task_arena.h"

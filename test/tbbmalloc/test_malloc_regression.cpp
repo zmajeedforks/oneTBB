@@ -19,7 +19,7 @@
 #include "common/test.h"
 #include "common/utils.h"
 #include "common/utils_report.h"
-#include "common/memory_usage.h"
+#include "common/memory_usage/memory_usage.h"
 #include "oneapi/tbb/detail/_utils.h"
 #include "tbb/scalable_allocator.h"
 #include "thread"

@@ -21,15 +21,13 @@
 
 #define __STDC_LIMIT_MACROS 1 // to get SIZE_MAX from stdint.h
 
+#include "common/memory_usage/memory_usage.h"
+
 #include "common/test.h"
 
 #include "common/utils.h"
 #include "common/utils_report.h"
 #include "common/spin_barrier.h"
-#if __CYGWIN__
-  #define TBB_CYGWIN_USE_WIN32 1
-#endif
-#include "common/memory_usage.h"
 
 #include "oneapi/tbb/detail/_config.h"
 
@@ -37,6 +35,8 @@
 #include "tbb/scalable_allocator.h"
 
 #include <vector>
+
+#define TBB_CYGWIN_USE_WIN32 1
 
 void limitMem( size_t limit );
 
@@ -1032,7 +1032,7 @@ TEST_CASE("MAIN TEST") {
 
 #endif /* __TBB_WIN8UI_SUPPORT	 */
 
-#if _WIN32 || _WIN64 || __CYGWIN__
+#if _WIN32 || _WIN64 || TBB_CYGWIN_USE_WIN32
 /**
  *  _WIN32_WINNT should be defined at the very beginning,
  *  because other headers might include <windows.h>
@@ -1097,54 +1097,3 @@ void limitMem( size_t limit )
 }
 #endif  // _WIN32 || _WIN64
 
-#if __CYGWIN__
-namespace utils {
-
-    //! Return estimate of number of bytes of memory that this program is currently using.
-    /* Returns 0 if not implemented on platform. */
-    std::size_t GetMemoryUsage(MemoryStatType stat) {
-        utils::suppress_unused_warning(stat);
-#if __TBB_WIN8UI_SUPPORT || defined(WINAPI_FAMILY)
-        return 0;
-#elif _WIN32 || __CYGWIN__
-        PROCESS_MEMORY_COUNTERS mem;
-        bool status = GetProcessMemoryInfo(GetCurrentProcess(), &mem, sizeof(mem)) != 0;
-        ASSERT(status, NULL);
-        return stat == currentUsage ? mem.PagefileUsage : mem.PeakPagefileUsage;
-#elif __unix__
-        long unsigned size = 0;
-        FILE* fst = fopen("/proc/self/status", "r");
-        ASSERT(fst != nullptr, NULL);
-        const int BUF_SZ = 200;
-        char buf_stat[BUF_SZ];
-        const char* pattern = stat == peakUsage ? "VmPeak: %lu" : "VmSize: %lu";
-        while (NULL != fgets(buf_stat, BUF_SZ, fst)) {
-            if (1 == sscanf(buf_stat, pattern, &size)) {
-                ASSERT(size, "Invalid value of memory consumption.");
-                break;
-            }
-        }
-        // VmPeak is available in kernels staring 2.6.15
-        if (stat != peakUsage || LinuxKernelVersion() >= 2006015) {
-          fprintf(stderr, "stat %d peakUsage %d LinuxKernelVersion %d\n", stat, peakUsage, LinuxKernelVersion());
-            ASSERT(size, "Invalid /proc/self/status format, pattern not found.");
-        }
-        fclose(fst);
-        return size * 1024;
-#elif __APPLE__ && !__ARM_ARCH
-        // TODO: find how detect peak virtual memory size under macOS
-        if (stat == peakUsage)
-            return 0;
-        kern_return_t status;
-        task_basic_info info;
-        mach_msg_type_number_t msg_type = TASK_BASIC_INFO_COUNT;
-        status = task_info(mach_task_self(), TASK_BASIC_INFO, reinterpret_cast<task_info_t>(&info), &msg_type);
-        ASSERT(status == KERN_SUCCESS, NULL);
-        return info.virtual_size - shared_size;
-#else
-        return 0;
-#endif
-    }
-
-} // namespace utils
-#endif

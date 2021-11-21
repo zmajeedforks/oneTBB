@@ -19,7 +19,7 @@
 #include "common/cpu_usertime.h"
 #include "common/utils_concurrency_limit.h"
 #include "common/parallel_invoke_common.h"
-#include "common/memory_usage.h"
+#include "common/memory_usage/memory_usage.h"
 
 #include <cstddef>
 #include <atomic>

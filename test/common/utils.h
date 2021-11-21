@@ -349,6 +349,7 @@ public:
     MoveOnly(MoveOnly&& other) : Movable(std::move(other)) {}
 };
 
+inline
 void Sleep ( int ms ) {
     std::chrono::milliseconds sleep_time( ms );
     std::this_thread::sleep_for( sleep_time );

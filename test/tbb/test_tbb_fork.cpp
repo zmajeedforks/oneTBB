@@ -160,7 +160,7 @@ void TestTasksInThread()
 
 #if TBB_REVAMP_TODO
 
-#include "common/memory_usage.h"
+#include "common/memory_usage/memory_usage.h"
 
 // check for memory leak during TBB task scheduler init/terminate life cycle
 // TODO: move to test_task_scheduler_init after workers waiting productization

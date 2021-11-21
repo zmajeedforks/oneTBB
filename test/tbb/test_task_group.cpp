@@ -243,7 +243,7 @@ void TestVagabondGroup () {
     NativeParallelFor( 2, SharedGroupBody<task_group_type>(2, VagabondGroup) );
 }
 
-#include "common/memory_usage.h"
+#include "common/memory_usage/memory_usage.h"
 
 template<typename task_group_type>
 void TestThreadSafety() {
